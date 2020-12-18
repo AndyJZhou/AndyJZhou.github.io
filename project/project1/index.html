@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="author" content="Andy Zhou" />
+    
+    <link rel="shortcut icon" type="image/x-icon" href="/img/favicon.ico">
+    <title>Comp Bio Project 1</title>
+    <meta name="generator" content="Hugo 0.79.0" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="/css/main.css" />
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,400,200bold,400old" />
+    
+    <!--[if lt IE 9]>
+			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+			<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+		<![endif]-->
+
+    
+  </head>
+
+  <body>
+    <div id="wrap">
+      
+      <nav class="navbar navbar-default">
+  <div class="container">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="/"><i class="fa fa-home"></i></a>
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <div class="navbar-collapse collapse" id="navbar">
+      <ul class="nav navbar-nav navbar-right">
+      
+        
+        <li><a href="/post/">BLOG</a></li>
+        
+        <li><a href="/projects/">PROJECTS</a></li>
+        
+        <li><a href="/resume/">RESUME</a></li>
+        
+      
+      </ul>
+    </div>
+  </div>
+</nav>
+
+      <div class="container">
+        <div class="blog-post">
+          <h3>
+            <strong><a href="/project/project1/">Comp Bio Project 1</a></strong>
+          </h3>
+        </div>
+ 
+<div class="blog-title">
+          <h4>
+         October 18, 2020 
+            &nbsp;&nbsp;
+            
+          </h4>
+        </div>
+
+        <div class="panel panel-default">
+          <div class="panel-body">
+            <div class="blogpost">
+              
+<link href="/rmarkdown-libs/anchor-sections/anchor-sections.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/anchor-sections/anchor-sections.js"></script>
+
+
+<pre class="r"><code>library(tidyverse)
+library(cluster)
+library(GGally)</code></pre>
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>The two datasets I have chosen are data local to my area (Bexar County) relating to the COVID-19 pandemic. The first dataset is COVID-19 data from San Antonio from February to September documenting information for cases, deaths, hospitalizations and ventilators. The second dataset pertains to the weather in San Antonio for that same time period. The weather measurements were collected from a weather station at San Antonio International Airport. I am taking them to be representative of the county for the purposes of this project. The weather measurements include information about temperature, precipitation, and wind. With speculation about the potential behavior of the coronavirus in different climate conditions, I wanted to perform this exploratory data analysis to see if I could find any interesting associations. Temperature was a factor that many scientists have speculated may have an effect on the ease of spread of the coronavirus and that is an association that I will look for.</p>
+<p>Full documentation for weather data: <a href="https://www1.ncdc.noaa.gov/pub/data/cdo/documentation/GHCND_documentation.pdf" class="uri">https://www1.ncdc.noaa.gov/pub/data/cdo/documentation/GHCND_documentation.pdf</a></p>
+<p>COVID-19 Data documentation: <a href="https://cosacovid-cosagis.hub.arcgis.com/datasets/samhd-daily-surveillance-data-public?selectedAttribute=strac_available_staffed_beds&amp;showData=true" class="uri">https://cosacovid-cosagis.hub.arcgis.com/datasets/samhd-daily-surveillance-data-public?selectedAttribute=strac_available_staffed_beds&amp;showData=true</a><br />
+<em>Note: STRAC is simply the acronym for the regional governmental heath authority that collected this data</em></p>
+</div>
+<div id="importing-datasets" class="section level3">
+<h3>Importing Datasets</h3>
+<pre class="r"><code>tempData &lt;- read.csv(&quot;2296372.csv&quot;)
+tempData %&gt;% head</code></pre>
+<pre><code>##       STATION                                     NAME LATITUDE LONGITUDE
+## 1 USW00012921 SAN ANTONIO INTERNATIONAL AIRPORT, TX US  29.5443  -98.4839
+## 2 USW00012921 SAN ANTONIO INTERNATIONAL AIRPORT, TX US  29.5443  -98.4839
+##   ELEVATION       DATE AWND AWND_ATTRIBUTES PGTM PGTM_ATTRIBUTES PRCP
+## 1     240.5 2020-02-01 4.92             ,,W   NA                    0
+## 2     240.5 2020-02-02 7.38             ,,W   NA                    0
+##   PRCP_ATTRIBUTES SNOW SNOW_ATTRIBUTES SNWD SNWD_ATTRIBUTES TAVG
+## 1        ,,W,2400    0             ,,W    0             ,,W   53
+## 2        ,,W,2400    0             ,,W    0             ,,W   56
+##   TAVG_ATTRIBUTES TMAX TMAX_ATTRIBUTES TMIN TMIN_ATTRIBUTES WDF2
+## 1            H,,S   72             ,,W   39             ,,W  240
+## 2            H,,S   76             ,,W   39             ,,W  160
+##   WDF2_ATTRIBUTES WDF5 WDF5_ATTRIBUTES WSF2 WSF2_ATTRIBUTES WSF5
+## 1             ,,W  280             ,,W 15.0             ,,W 21.0
+## 2             ,,W  170             ,,W 16.1             ,,W 21.9
+##   WSF5_ATTRIBUTES WT01 WT01_ATTRIBUTES WT02 WT02_ATTRIBUTES WT03
+## 1             ,,W   NA                   NA                   NA
+## 2             ,,W   NA                   NA                   NA
+##   WT03_ATTRIBUTES WT04 WT04_ATTRIBUTES WT05 WT05_ATTRIBUTES WT07
+## 1                   NA                   NA                   NA
+## 2                   NA                   NA                   NA
+##   WT07_ATTRIBUTES WT08 WT08_ATTRIBUTES
+## 1                   NA                
+## 2                   NA                
+##  [ reached &#39;max&#39; / getOption(&quot;max.print&quot;) -- omitted 4 rows ]</code></pre>
+<pre class="r"><code>covData &lt;- read.csv(&quot;SAMHD_Daily_Surveillance_Data_Public.csv&quot;)
+covData %&gt;% tail</code></pre>
+<pre><code>##     ï..X Y objectid                               globalid      reporting_date
+## 222    0 0      225 {EF69BFA2-3C76-4048-8BE5-E5B1B1B5350C} 2020/09/21 17:00:00
+## 223    0 0      226 {92E639CD-0122-40D5-80DB-1DC6E91A4931} 2020/09/22 17:00:00
+## 224    0 0      227 {6EE05EBA-FB68-4CEB-83ED-7D0C62442915} 2020/09/23 17:00:00
+## 225    0 0      228 {737482B7-3BDF-4DC9-83AC-BE9614474858} 2020/09/24 17:00:00
+## 226    0 0      229 {6051E9F0-C7F5-4CD5-81C4-444CC3A6E90B} 2020/09/25 17:00:00
+##     total_case_daily_change total_case_cumulative deaths_daily_change
+## 222                     102                 53443                   1
+## 223                     196                 53639                   6
+## 224                     155                 53794                   0
+## 225                     177                 53971                   5
+## 226                     224                 54195                   0
+##     deaths_cumulative strac_covid_positive_in_hospita
+## 222              1062                             226
+## 223              1068                             233
+## 224              1068                             228
+## 225              1073                             231
+## 226              1073                             225
+##     strac_covid_positive_in_icu strac_covid_positive_on_ventila
+## 222                          85                              45
+## 223                          86                              42
+## 224                          87                              41
+## 225                          87                              36
+## 226                          83                              34
+##     strac_total_ventilators strac_available_ventilators
+## 222                     768                         550
+## 223                     767                         537
+## 224                     767                         539
+## 225                     772                         564
+## 226                     767                         556
+##     strac_total_staffed_beds strac_available_staffed_beds day_number
+## 222                     4485                          863         NA
+## 223                     4501                          626         NA
+## 224                     4487                          596         NA
+## 225                     4481                          554         NA
+## 226                     4499                          526         NA
+##  [ reached &#39;max&#39; / getOption(&quot;max.print&quot;) -- omitted 1 rows ]</code></pre>
+<div id="remove-unwanted-variables-from-datasets" class="section level4">
+<h4>Remove Unwanted Variables from Datasets</h4>
+<pre class="r"><code># Make some custom functions
+# Counts the number of NA&#39;s for a variabe
+countNAs &lt;- function(x){
+  sum(is.na(x))
+}
+
+# Reports the proportion of NA&#39;s for a variable
+propNAs &lt;- function(x){
+  mean(is.na(x))
+}
+
+# Filter out variables with too many na&#39;s
+covData &lt;- covData %&gt;% select_if(~propNAs(.) &lt; 0.5)
+tempData &lt;- tempData %&gt;% select_if(~propNAs(.) &lt; 0.5)</code></pre>
+<p>These custom functions help me filter out variables that are comprised of 50% or more NA’s.</p>
+</div>
+<div id="clean-up-columns-before-join" class="section level4">
+<h4>Clean Up Columns Before Join</h4>
+<pre class="r"><code>covData &lt;- covData %&gt;% separate(reporting_date,into=c(&quot;reporting_date&quot;,&quot;TIME&quot;),sep=&quot; &quot;) %&gt;% select(-TIME)%&gt;% 
+  mutate(reporting_date=str_trim(reporting_date)) %&gt;% mutate(objectid=as.character(objectid)) %&gt;% mutate(day_number=seq(1:nrow(covData)))
+
+tempData &lt;- tempData %&gt;% mutate(DATE = str_replace_all(DATE, &quot;-&quot;,&quot;/&quot;)) %&gt;% mutate(DATE = str_trim(DATE)) %&gt;% select(-contains(c(&quot;attributes&quot;,&quot;WT&quot;))) %&gt;% select(-(1:5))</code></pre>
+<p>This puts the two date variables that I will be joining by into the same format so that the join will be successful.</p>
+</div>
+</div>
+<div id="joiningmerging" class="section level3">
+<h3>Joining/Merging</h3>
+<p>I joined my two variables by date, as each observation is either dataset represented the data collected for a single day. I used a <code>left_join</code> with the COVID-19 data to ensure it is preserved because the information in that dataset is more valuable to my exploratory data analysis than the weather data. The weather data is more of a supplementary dataset to add extra information to the COVID-19 data that I am really interested in. There were 227 observations in <code>covData</code> and 237 observations in <code>tempData</code>.
+10 days were lost from <code>tempData</code> after the join, but that’s because it had more days than <code>covData</code> which is not a significant issue. After joining, I also separate the date variable that I joined by to into individual variables that will help with my analysis later. Then I clean up the dataset by removing all NA’s.</p>
+<pre class="r"><code># Join Datasets
+covData &lt;- covData %&gt;% left_join(tempData, by = c(&quot;reporting_date&quot;=&quot;DATE&quot;))
+covData &lt;- covData %&gt;% separate(reporting_date, into = c(&quot;Year&quot;, &quot;Month&quot;, &quot;Day&quot;),convert = T)</code></pre>
+<pre class="r"><code># Remove NA&#39;s
+before &lt;- nrow(covData)
+covData &lt;- covData %&gt;% na.omit()
+covData %&gt;% head</code></pre>
+<pre><code>##    objectid                               globalid Year Month Day
+## 50       50 {82B93AAE-BE14-4075-9B5E-5EA5F511008A} 2020     4   1
+## 51       51 {9F051745-BDD0-45CA-BAAC-3D447A86F245} 2020     4   2
+## 52       52 {A4A103A0-58B0-40CC-B9CD-43F06F4CB459} 2020     4   3
+##    total_case_daily_change total_case_cumulative deaths_daily_change
+## 50                      23                   229                   1
+## 51                      25                   254                   0
+## 52                      88                   342                   0
+##    deaths_cumulative strac_covid_positive_in_hospita
+## 50                 9                              72
+## 51                 9                              67
+## 52                 9                              75
+##    strac_covid_positive_in_icu strac_covid_positive_on_ventila
+## 50                          31                              26
+## 51                          32                              27
+## 52                          37                              28
+##    strac_total_ventilators strac_available_ventilators strac_total_staffed_beds
+## 50                     726                         566                     4580
+## 51                     707                         532                     4567
+## 52                     720                         546                     4601
+##    strac_available_staffed_beds day_number AWND PRCP SNOW SNWD TAVG TMAX TMIN
+## 50                         1480         50 9.17 0.00    0    0   65   80   52
+## 51                         1969         51 7.83 0.46    0    0   67   70   63
+## 52                         2172         52 8.28 0.12    0    0   70   75   51
+##    WDF2 WDF5 WSF2 WSF5
+## 50  130  140 19.9 25.9
+## 51  130  120 15.0 19.9
+## 52  360  360 19.9 34.0
+##  [ reached &#39;max&#39; / getOption(&quot;max.print&quot;) -- omitted 3 rows ]</code></pre>
+<pre class="r"><code>after &lt;- nrow(covData)</code></pre>
+<p>After removing NA’s, I lost 57 rows, which is a significant amount. However, upon a closer look, the majority of the rows were in the beginning of the dataset. My dataset originally started in February but after removing NA’s it starts in April. This is due to the fact that early on in the pandemic, data for many of the variables in the dataset was not collected. Thus, February and March don’t have detailed information for most of the variables. This is an artifact of the initial pandemic response. The loss is unfortunate but should not affect my exploratory analysis is a major way. It just reduced the time period I have data for.</p>
+</div>
+<div id="wrangling-and-tidying-rearranging-widelong" class="section level3">
+<h3>Wrangling and Tidying: Rearranging Wide/Long</h3>
+<p>To put my summary statistics in prettier tables, I calculated the statistics, then used <code>pivot_longer</code> to display them in an easy to read way.</p>
+</div>
+<div id="summary-statistics" class="section level3">
+<h3>Summary Statistics</h3>
+<div id="average" class="section level4">
+<h4>Average</h4>
+<pre class="r"><code>average &lt;- covData %&gt;% summarize_if(is.numeric,mean) %&gt;% pivot_longer(everything(),names_to = &quot;Measure&quot;, values_to = &quot;Average&quot;) %&gt;% mutate(Average=round(Average)) %&gt;% arrange(desc(Average))
+average</code></pre>
+<pre><code>## # A tibble: 26 x 2
+##    Measure                         Average
+##    &lt;chr&gt;                             &lt;dbl&gt;
+##  1 total_case_cumulative             19324
+##  2 strac_total_staffed_beds           4505
+##  3 Year                               2020
+##  4 strac_available_staffed_beds       1135
+##  5 strac_total_ventilators             732
+##  6 strac_available_ventilators         486
+##  7 strac_covid_positive_in_hospita     424
+##  8 total_case_daily_change             287
+##  9 deaths_cumulative                   287
+## 10 strac_covid_positive_in_icu         165
+## # ... with 16 more rows</code></pre>
+<p>Some notable results to point out:<br />
+The average daily change in cases was 287 cases.<br />
+The average daily change in deaths was 5 deaths.<br />
+The average daily wind speed was 9 mph.<br />
+We can see that over this period, there were a lot of new cases as shown by the large daily average. Contrast this with the relatively smaller average daily change in death. We can see that most people who were infected do not die. There was also a decent amount of wind over this period, which is unlikely to have been a contributing factor in the spread of the virus, but may be interesting to consider,especially with new evidence of it’s airborne transmission.</p>
+</div>
+<div id="standard-deviation" class="section level4">
+<h4>Standard Deviation</h4>
+<pre class="r"><code>standard_deviation &lt;- covData %&gt;% summarize_if(is.numeric,sd) %&gt;% pivot_longer(everything(),names_to = &quot;Measure&quot;, values_to = &quot;Standard_Deviation&quot;) %&gt;% mutate(Standard_Deviation=round(Standard_Deviation)) %&gt;% arrange(desc(Standard_Deviation))
+standard_deviation</code></pre>
+<pre><code>## # A tibble: 26 x 2
+##    Measure                         Standard_Deviation
+##    &lt;chr&gt;                                        &lt;dbl&gt;
+##  1 total_case_cumulative                        19564
+##  2 strac_available_staffed_beds                   588
+##  3 total_case_daily_change                        531
+##  4 strac_covid_positive_in_hospita                408
+##  5 strac_total_staffed_beds                       406
+##  6 deaths_cumulative                              328
+##  7 strac_covid_positive_in_icu                    144
+##  8 strac_covid_positive_on_ventila                 96
+##  9 WDF2                                            88
+## 10 WDF5                                            88
+## # ... with 16 more rows</code></pre>
+<p>Some notable results to point out:<br />
+The standard deviation of total staffed beds was 406 beds.<br />
+The standard deviation of available ventilators was 77 ventilators.<br />
+The standard deviation of total ventilators was 33 ventilators.</p>
+<p>This provides a measure of the spread of values for each variable, giving us an idea of how much these indicators changed during the course of the pandemic. We can see that there was a fairly high amount of traffic in and out of hospital beds. This may be good or bad depending on why the patient was moved out of the bed. We can also see that there was a fair amount of fluctuation in the usage of ventilators, implying that the number of critical cases fluctuated during this period as well. Interestingly, there is also some standard deviation of the total amount of ventilators. A dive into the data suggests that this is due to the addition of a large number of new ventilators during this period, documenting the addition of supplies during the county’s coronavirus response.</p>
+</div>
+<div id="max" class="section level4">
+<h4>Max</h4>
+<pre class="r"><code>Max &lt;- covData %&gt;% summarize_if(is.numeric,max) %&gt;% pivot_longer(everything(),names_to = &quot;Measure&quot;, values_to = &quot;Maximum_Value&quot;) %&gt;% arrange(desc(Maximum_Value))
+Max</code></pre>
+<pre><code>## # A tibble: 26 x 2
+##    Measure                         Maximum_Value
+##    &lt;chr&gt;                                   &lt;dbl&gt;
+##  1 total_case_cumulative                   53794
+##  2 total_case_daily_change                  5501
+##  3 strac_total_staffed_beds                 4848
+##  4 strac_available_staffed_beds             4392
+##  5 Year                                     2020
+##  6 strac_covid_positive_in_hospita          1267
+##  7 deaths_cumulative                        1068
+##  8 strac_total_ventilators                   807
+##  9 strac_available_ventilators               606
+## 10 strac_covid_positive_in_icu               438
+## # ... with 16 more rows</code></pre>
+<p>Some notable results to point out:<br />
+The maximum value of total cases was 53794 cases.<br />
+The maximum value of daily case change was 5501 cases.<br />
+The maximum value of total deaths was 1068 deaths.</p>
+<p>From the high maximum total case we can see the toll of the pandemic at the time this data was collected in mid-September. We can also see the single worse day in the pandemic in terms of new cases for Bexar County. It should be noted that there was one day where backlogged cases had been entered and thus this max value may reflect that data idiosyncrasy and not a real daily case change count. We can also see the death toll the virus has taken on the community with the total deaths at the time of the data collection. These metrics show that COVID-19 is no joke and that we should all take health recommendations seriously.</p>
+</div>
+<div id="min" class="section level4">
+<h4>Min</h4>
+<pre class="r"><code>Min &lt;- covData %&gt;% summarize_if(is.numeric,min) %&gt;% pivot_longer(everything(),names_to = &quot;Measure&quot;, values_to = &quot;Minimum_Value&quot;) %&gt;% arrange(Minimum_Value) %&gt;% filter(`Minimum_Value`&gt;0)
+Min</code></pre>
+<pre><code>## # A tibble: 22 x 2
+##    Measure                         Minimum_Value
+##    &lt;chr&gt;                                   &lt;dbl&gt;
+##  1 Day                                      1   
+##  2 AWND                                     2.91
+##  3 Month                                    4   
+##  4 total_case_daily_change                  5   
+##  5 deaths_cumulative                        9   
+##  6 WDF2                                    10   
+##  7 WDF5                                    10   
+##  8 WSF2                                    10.1 
+##  9 WSF5                                    13   
+## 10 strac_covid_positive_on_ventila         14   
+## # ... with 12 more rows</code></pre>
+<p>Some notable results to point out:<br />
+The lowest number of positive cases in the ICU was 29 cases.<br />
+The lowest number of available staffed beds was 322 beds.<br />
+The lowest average temperature was 53 degrees Fahrenheit.</p>
+<p>The min data shows some interesting information. The min ICU positive cases shows that the virus was not wreaking maximum devastation during the entire 6-month period. It seems that there were times of calmness in the pandemic. Contrast that with minimum number of available beds and we see that there were certainly days where it may have felt that the pandemic was overwhelming. For county-level data, such a low number of available is concerning. On a lighter note, we can also see that during this period there were actually days of colder weather, a bit more enjoyable than the sweltering summer heat.</p>
+</div>
+<div id="distinct" class="section level4">
+<h4>Distinct</h4>
+<pre class="r"><code>Distinct &lt;- covData %&gt;% summarize_if(is.numeric,n_distinct) %&gt;% pivot_longer(everything(),names_to = &quot;Measure&quot;, values_to = &quot;Number_of_Distinct_Values&quot;) %&gt;% pivot_wider(names_from = &quot;Measure&quot;, values_from=&quot;Number_of_Distinct_Values&quot;) %&gt;% select(PRCP,AWND,strac_total_staffed_beds, everything())
+Distinct</code></pre>
+<pre><code>## # A tibble: 1 x 26
+##    PRCP  AWND strac_total_sta~  Year Month   Day total_case_dail~
+##   &lt;int&gt; &lt;int&gt;            &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt;            &lt;int&gt;
+## 1    25    46              129     1     6    31              141
+## # ... with 19 more variables: total_case_cumulative &lt;int&gt;,
+## #   deaths_daily_change &lt;int&gt;, deaths_cumulative &lt;int&gt;,
+## #   strac_covid_positive_in_hospita &lt;int&gt;, strac_covid_positive_in_icu &lt;int&gt;,
+## #   strac_covid_positive_on_ventila &lt;int&gt;, strac_total_ventilators &lt;int&gt;,
+## #   strac_available_ventilators &lt;int&gt;, strac_available_staffed_beds &lt;int&gt;,
+## #   day_number &lt;int&gt;, SNOW &lt;int&gt;, SNWD &lt;int&gt;, TAVG &lt;int&gt;, TMAX &lt;int&gt;,
+## #   TMIN &lt;int&gt;, WDF2 &lt;int&gt;, WDF5 &lt;int&gt;, WSF2 &lt;int&gt;, WSF5 &lt;int&gt;</code></pre>
+<p>Some notable results to point out:<br />
+There was 25 distinct values in precipitation.<br />
+There was 46 distinct values in average wind speed.<br />
+There was 129 distinct values in total staffed beds.</p>
+<p>The distinct summary statistics tell us information similar to standard deviation. The low number of distinct precipitation values tells us that unsurprisingly, Texas received little rainfall during this period. There are roughly 170 data points but only 25 distinct values of precipitation (most of them are 0). The distinct number of wind values tells us that either there was little to no wind most days or that what wind there was was really consistent across this period. And to bring it back to COVID-19 again, we can see that the 129 distinct values in total staffed beds reveals that there was frequent movement in and out of the beds during this period.</p>
+</div>
+<div id="correlation" class="section level4">
+<h4>Correlation</h4>
+<pre class="r"><code>covData %&gt;% select(-(1:5),-SNOW,-SNWD) %&gt;% cor() %&gt;% as.data.frame %&gt;% head %&gt;% select(1:5)</code></pre>
+<pre><code>##                                 total_case_daily_change total_case_cumulative
+## total_case_daily_change                      1.00000000             0.1670843
+## total_case_cumulative                        0.16708426             1.0000000
+## deaths_daily_change                          0.23539775             0.5272661
+## deaths_cumulative                           -0.01187052             0.9203472
+## strac_covid_positive_in_hospita              0.58638655             0.4452675
+## strac_covid_positive_in_icu                  0.55899669             0.5410933
+##                                 deaths_daily_change deaths_cumulative
+## total_case_daily_change                   0.2353978       -0.01187052
+## total_case_cumulative                     0.5272661        0.92034721
+## deaths_daily_change                       1.0000000        0.36203617
+## deaths_cumulative                         0.3620362        1.00000000
+## strac_covid_positive_in_hospita           0.4243549        0.13694220
+## strac_covid_positive_in_icu               0.5082863        0.21606705
+##                                 strac_covid_positive_in_hospita
+## total_case_daily_change                               0.5863866
+## total_case_cumulative                                 0.4452675
+## deaths_daily_change                                   0.4243549
+## deaths_cumulative                                     0.1369422
+## strac_covid_positive_in_hospita                       1.0000000
+## strac_covid_positive_in_icu                           0.9831246</code></pre>
+<p>Here’s the correlation matrix for all the numeric variables. Discussion will follow after the heat map later on.</p>
+</div>
+<div id="grouping-by-1-categorical-variable" class="section level4">
+<h4>Grouping by 1 Categorical Variable</h4>
+<pre class="r"><code># Summary statistic after grouping by above or below average new cases
+grp1 &lt;- covData %&gt;% mutate(abovavg=total_case_daily_change&gt;mean(total_case_daily_change)) %&gt;% group_by(abovavg) %&gt;% select_if(is.numeric) %&gt;% summarise_all(sd)
+grp1 %&gt;% select(1,strac_available_staffed_beds,5:7)</code></pre>
+<pre><code>## # A tibble: 2 x 5
+##   abovavg strac_available_s~ total_case_daily~ total_case_cumu~ deaths_daily_ch~
+##   &lt;lgl&gt;                &lt;dbl&gt;             &lt;dbl&gt;            &lt;dbl&gt;            &lt;dbl&gt;
+## 1 FALSE                 572.              70.7           21542.             7.96
+## 2 TRUE                  333.             811.            12763.             6.16</code></pre>
+<p>Here is the standard deviation of the numeric variables grouped by whether those days had above average change in daily cases or not.
+The usefulness of this display can be seen in this example. Consider the available staffed beds variable. When the new case counts were below average, i.e the virus was not spreading fast, we can see that the standard deviation of available staffed beds was 572, as compared to 333 during the period when the virus was spreading quickly. It’s interesting that the standard deviation was higher in the below average period than the above average period. This might be because that there was more variance in the case counts as the virus was picking up and that once it had spread in the community, the daily case change became more consistent. Thus we can more easily understand the effects of the worse days on the pandemic compared to the better days (in terms of new cases) on hospital resources.</p>
+</div>
+<div id="grouping-by-2-categorical-variables" class="section level4">
+<h4>Grouping by 2 Categorical Variables</h4>
+<pre class="r"><code># Summary statistic after grouping by by above or below average new cases and month
+covData %&gt;% mutate(abovavg=total_case_daily_change&gt;mean(total_case_daily_change)) %&gt;% group_by(Month,abovavg) %&gt;% select_if(is.numeric) %&gt;% summarise_all(sd)</code></pre>
+<pre><code>## # A tibble: 9 x 27
+## # Groups:   Month [6]
+##   Month abovavg  Year   Day total_case_dail~ total_case_cumu~ deaths_daily_ch~
+##   &lt;int&gt; &lt;lgl&gt;   &lt;dbl&gt; &lt;dbl&gt;            &lt;dbl&gt;            &lt;dbl&gt;            &lt;dbl&gt;
+## 1     4 FALSE       0  8.80             17.4             349.             1.83
+## 2     5 FALSE       0  9.09             37.7             373.             1.04
+## 3     6 FALSE       0  5.73             86.5            1072.             1.25
+## 4     6 TRUE        0  4.46            258.             2176.             1.45
+## 5     7 FALSE      NA NA                NA                NA             NA   
+## 6     7 TRUE        0  9.01            974.             9404.             5.35
+## 7     8 FALSE       0  7.86             58.3            1455.            11.5 
+## 8     8 TRUE        0  3.96             32.3             865.             8.26
+## 9     9 FALSE       0  5.87             38.7            2281.             6.38
+## # ... with 20 more variables: deaths_cumulative &lt;dbl&gt;,
+## #   strac_covid_positive_in_hospita &lt;dbl&gt;, strac_covid_positive_in_icu &lt;dbl&gt;,
+## #   strac_covid_positive_on_ventila &lt;dbl&gt;, strac_total_ventilators &lt;dbl&gt;,
+## #   strac_available_ventilators &lt;dbl&gt;, strac_total_staffed_beds &lt;dbl&gt;,
+## #   strac_available_staffed_beds &lt;dbl&gt;, day_number &lt;dbl&gt;, AWND &lt;dbl&gt;,
+## #   PRCP &lt;dbl&gt;, SNOW &lt;dbl&gt;, SNWD &lt;dbl&gt;, TAVG &lt;dbl&gt;, TMAX &lt;dbl&gt;, TMIN &lt;dbl&gt;,
+## #   WDF2 &lt;dbl&gt;, WDF5 &lt;dbl&gt;, WSF2 &lt;dbl&gt;, WSF5 &lt;dbl&gt;</code></pre>
+<p>Here is that same dataset but now grouped by month.
+We can see that April and May had only days where new cases were below average compared to the period overall, while starting in June, there were worse days and better days for each of the subsequent months. This summarizes the virus’ initial spread across Bexar County and then subsequent waves as the pandemic dragged on and worsened. Alternatively, this may also be capturing the slow response in implementing testing.<br />
+Note the row of NA’s in July, that is due to the fact that there was only a single day that was below average in July, which is why there is no standard deviation data for that category.</p>
+</div>
+<div id="new-composite-statistic" class="section level4">
+<h4>New Composite Statistic</h4>
+<pre class="r"><code>covData %&gt;% mutate_at(.vars = c(&quot;total_case_daily_change&quot;,&quot;deaths_daily_change&quot;,&quot;strac_covid_positive_in_hospita&quot;,&quot;strac_covid_positive_in_icu&quot;,&quot;strac_covid_positive_on_ventila&quot;),scale) %&gt;% mutate(worst=(total_case_daily_change+deaths_daily_change+strac_covid_positive_in_hospita+strac_covid_positive_in_icu+strac_covid_positive_on_ventila)/5)%&gt;% select(Month,Day,Year,worst) %&gt;% top_n(n = 5,worst) %&gt;% arrange(-worst)</code></pre>
+<pre><code>##   Month Day Year    worst
+## 1     7  16 2020 3.499834
+## 2     8  11 2020 2.122486
+## 3     7  19 2020 1.904817
+## 4     7  22 2020 1.720576
+## 5     7  28 2020 1.682672</code></pre>
+<p>This creates a new variable “worst” that is a composite statistic that summarizes/combines: daily case change, daily death change, positive cases in the hospital, positive cases in the ICU, and positive cases on ventilators. It is the average of their z scores for each day and may provide a clearer picture of how “bad” a given day in the pandemic was compared to all days across the period. Shown above are the top 5 “worst” days of the pandemic.</p>
+</div>
+</div>
+<div id="data-visualization" class="section level3">
+<h3>Data Visualization</h3>
+<div id="st-plot" class="section level4">
+<h4>1st Plot</h4>
+<pre class="r"><code># Avg temperature when new cases were above average
+covData %&gt;% mutate(`Above Average`=(TAVG&gt;mean(TAVG))) %&gt;% 
+  ggplot()+
+  geom_histogram(aes(TAVG,total_case_daily_change,fill=`Above Average`),stat = &quot;summary&quot;,fun=mean)+
+  scale_fill_manual(values = c(&quot;blue&quot;,&quot;red&quot;))+
+  xlab(&quot;Temperature in Fahrenheit&quot;)+
+  ylab(&quot;Average Number of New Daily Cases&quot;)+
+  ggtitle(&quot;Average New Daily Cases for Days with Above and Below Average Temperatures&quot;)+
+  scale_y_continuous(breaks=seq(0,900,50))+
+  scale_x_binned(breaks = seq(0,max(covData$TAVG),2),)+
+  theme(panel.grid.minor=element_blank())</code></pre>
+<p><img src="/project/project1_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
+This plot shows the the spectrum of temperatures for this time period and the associated average daily change in case count for days with those temperatures. The color indicates if the temperature that day was above or below the average temperature for this period. Note that the individual temperatures on the x-axis are technically average temperatures as well (they come from variable <code>TAVG</code>), but they are average temperatures for each individual day as opposed to across the 6 month period.<br />
+We can see that the days with higher new cases also corresponded to days with above average temperatures. This may hint at an association between daily new cases and temperature. It is also important to point out that time may be a confounding variable as the virus appeared in America right as temperatures were getting hotter anyways.</p>
+</div>
+<div id="nd-plot" class="section level4">
+<h4>2nd Plot</h4>
+<pre class="r"><code># Daily change in case total by day and with average temperature
+covData %&gt;% mutate(`Average Temperature`=TAVG) %&gt;% ggplot(aes(day_number,total_case_daily_change))+
+  geom_point(aes(color = `Average Temperature`),size = 2)+
+  scale_color_gradient2(low = &quot;blue&quot;, mid = &quot;white&quot;, high = &quot;darkred&quot;, midpoint = 70)+
+  xlab(&quot;Day Number Starting at April 1st&quot;)+
+  ylab(&quot;New Cases that Day&quot;)+
+  ggtitle(&quot;Daily Change in Case Total by Day and with Average Temperature in Fahrenheit&quot;)+
+  scale_y_continuous(breaks=seq(0,6000,500))+
+  scale_x_continuous(breaks = seq(0,300,10))+
+  theme(panel.grid.minor=element_blank())</code></pre>
+<p><img src="/project/project1_files/figure-html/unnamed-chunk-17-1.png" width="672" style="display: block; margin: auto;" />
+This plot seeks to track the association between new daily cases and temperature but now across time to see if there really is confounding between variables. We can see that the new cases did rise with time. However, around day 175, we can see declines in new cases as well as temperature as time passes. Thus, this is more evidence of an association between temperature and new cases as they both rise and fall at the same time. Of course, there is the possibility that this is a coincidence as well as this could be the result of states really getting a hold on public health procedures and testing around this time. More data about the specific times policy initiatives were implemented would be needed to rule out time as a confounding variable.</p>
+</div>
+<div id="rd-plot" class="section level4">
+<h4>3rd Plot</h4>
+<pre class="r"><code>covData %&gt;% mutate(month2=as.factor(recode(Month,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;April&quot;,&quot;May&quot;,&quot;June&quot;,&quot;July&quot;,&quot;August&quot;,&quot;September&quot;))) %&gt;% mutate(month2=factor(month2,c(&quot;April&quot;,&quot;May&quot;,&quot;June&quot;,&quot;July&quot;,&quot;August&quot;,&quot;September&quot;))) %&gt;%
+  mutate(`Positive Cases in ICU&#39;s`=strac_covid_positive_in_icu) %&gt;% 
+  ggplot(aes(`Positive Cases in ICU&#39;s`,strac_available_ventilators,color=`Positive Cases in ICU&#39;s`))+
+  geom_point(size = 2)+
+  facet_wrap(~month2,nrow = 3,ncol = 2)+
+  scale_color_gradient(low = &quot;orange&quot;, high = &quot;darkred&quot;)+
+  xlab(&quot;Positive Cases in ICU&#39;s&quot;)+
+  ylab(&quot;Available Ventilators in Hospitals&quot;)+
+  ggtitle(&quot;Relationship between ICU Occupancy and Ventilator Supply per Month&quot;)</code></pre>
+<p><img src="/project/project1_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
+This plot shows the relationship between the number of positive cases in hospital ICU’s and the supply of ventilators for each month in this period. The color is redundant but helps with visualizing the story.
+We can see a pretty clear negative correlation between the two variables. This plot also groups by month to make it easier to see the progression of the pandemic during this period. We can see the pandemic build up in April in May, the worst months of June and July, and then see the virus recede in September, likely as a response to state and national health directives, closures etc. This plot helps track the story of the virus as well as show the tangible effects of public health guidelines. This is of course inferred and more data about actual policies put in place during this time would be needed to confirm.</p>
+</div>
+<div id="th-plot" class="section level4">
+<h4>4th Plot</h4>
+<pre class="r"><code># Heatmap
+covData %&gt;% select(-(1:5),-SNOW,-SNWD) %&gt;% cor %&gt;% as.data.frame() %&gt;% rownames_to_column(&quot;Variable1&quot;) %&gt;% pivot_longer(-1,names_to=&quot;Variable2&quot;,values_to=&quot;Correlation&quot;) %&gt;% ggplot(aes(Variable1,Variable2,fill=Correlation))+geom_tile()+
+scale_fill_gradient2(low=&quot;red&quot;,mid=&quot;white&quot;,high=&quot;blue&quot;)+ #makes colors!
+geom_text(aes(label=round(Correlation,2)),color = &quot;black&quot;, size = 3)+ #overlays correlation values
+theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = .5))+ #flips the x-axis labels
+coord_fixed()+
+ggtitle(&quot;Correlation Heat map of Numeric Variables&quot;)</code></pre>
+<p><img src="/project/project1_files/figure-html/unnamed-chunk-19-1.png" width="1152" style="display: block; margin: auto;" />
+It is interesting from this heat map of the correlation between numeric variables that the temperature variables were more strongly correlated with hospital resources, such as hospital ventilators, than with daily case changes. We see a stronger negative correlation between TMAX, TAVG, and TMIN with available ventilators than a positive one with daily case change.
+We also see barely any correlation between wind variables and any other numeric variable. This may have been due to the fact that wind patterns did not really change that much during this period nor had any impact on the spread of the virus. This data suggests that climate may have less association with the spread of the pandemic than I assumed at the outset of this project.</p>
+</div>
+</div>
+<div id="clusters" class="section level3">
+<h3>Clusters</h3>
+<div id="choosing-k" class="section level4">
+<h4>Choosing k</h4>
+<pre class="r"><code>sil_width &lt;- numeric()
+for (i in 2:10) {
+  pam_fit &lt;- covData %&gt;% select(-(1:5)) %&gt;% select_if(is.numeric) %&gt;% scale %&gt;% pam(k = i)
+  sil_width[i] &lt;- pam_fit$silinfo$avg.width
+}
+
+ggplot()+
+  geom_line(aes(x=1:10, y= sil_width))+scale_x_continuous(name = &quot;k&quot;,breaks = 1:10)+
+  ylab(&quot;Average Silhouette Width&quot;)+
+  ggtitle(&quot;Choosing the Right k&quot;)</code></pre>
+<p><img src="/project/project1_files/figure-html/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" />
+Given this plot of the silhouette width, I chose to use 2 clusters. There was no underlying conceptual or theoretical reasons to choose a specific k for this data so the clustering is truly an exploratory venture to see what interesting groups we can get.</p>
+</div>
+<div id="running-pam-and-visualizing" class="section level4">
+<h4>Running PAM and Visualizing</h4>
+<pre class="r"><code>cov_pam &lt;- covData %&gt;% select(-(1:5)) %&gt;% select_if(is.numeric) %&gt;% scale %&gt;% pam(k = 2)
+
+plot(cov_pam,which=2)</code></pre>
+<p><img src="/project/project1_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
+With an average silhouette width of 0.35, the structure in the data is likely to be weak or artificial. This is not surprising given the disparate datasets that I have combined and the fact that there really isn’t any theoretical reason why this type of data would naturally cluster.</p>
+<pre class="r"><code>covData %&gt;% mutate(cluster=as.factor(cov_pam$clustering)) %&gt;% 
+  ggpairs(columns=c(&quot;total_case_daily_change&quot;,&quot;deaths_daily_change&quot;,&quot;total_case_cumulative&quot;,&quot;deaths_cumulative&quot;,&quot;strac_covid_positive_in_hospita&quot;,&quot;strac_covid_positive_in_icu&quot;,&quot;strac_covid_positive_on_ventila&quot;,&quot;strac_total_ventilators&quot;,&quot;strac_available_ventilators&quot;,&quot;day_number&quot;), aes(color=cluster))</code></pre>
+<p><img src="/project/project1_files/figure-html/unnamed-chunk-22-1.png" width="2880" style="display: block; margin: auto;" /></p>
+<p>If you look at the graph comparing cumulative deaths and positive rates you can see the positive rates shoot up before the deaths begin increasing. This shows taht the buildup of cumulative deaths happens in an environment of many positive cases, which makes sense as positive cases preclude death. We see a strong correlation between positive cases in the hospital with positive cases in the ICU, which is not surprising.</p>
+<p>The variable that is the best in almost all cases in defining clusters is day number. From the scatter plots shown, for just about all the variables, the cluster delineates two time periods of different trends. Looking at daily case change and daily death change we see the cluster split the period into a period of low change and a period of more fluctuation. There is also a clear delineation when looking at ventilator supplies, with the two clusters separating a period of more stability and one one of more change. From the density plots, we can see that the distributions of the cluster follow a bimodal distribution. It seems that the clustering algorithm is picking up on the fact that the virus had a calmer period of infection and affliction followed by one that was more severe. This is intuitive to us from our personal experience, but impressive from what is essentially a number cruncher. This may offer support that the numeric variables tracked by public health authorities may be pretty good indicators and provide a good picture of the state of the pandemic. Kudos to the public health experts.</p>
+</div>
+</div>
+
+            
+        <hr>         <div class="related-posts">
+                <h5>Related Posts</h5>
+                
+              </div> 
+            </div>
+          </div>
+
+   <hr>  <div class="disqus">
+  <div id="disqus_thread"></div>
+  <script type="text/javascript">
+
+    (function() {
+      
+      
+      if (window.location.hostname == "localhost")
+        return;
+
+      var disqus_shortname = '';
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+  </script>
+  <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  <a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div> 
+        </div>
+      </div>
+    </div>
+
+    
+    <footer>
+  <div id="footer">
+    <div class="container">
+      <p class="text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io/">Hugo</a> and
+      <a href="http://www.github.com/nurlansu/hugo-sustain/">sustain</a> with ♥</p>
+    </div>
+  </div>
+</footer>
+<div class="footer"></div>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="/js/docs.min.js"></script>
+<script src="/js/main.js"></script>
+
+<script src="/js/ie10-viewport-bug-workaround.js"></script>
+
+
+    
+  </body>
+</html>

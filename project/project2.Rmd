@@ -1,0 +1,511 @@
+---
+title: "Comp Bio Project 2"
+author: "Andy Zhou, ajz476"
+date: '2020-11-25'
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: True
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, fig.align = "center", warning = F, message = F,
+tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
+# library(Stat2Data)
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(plotROC)
+library(glmnet)
+library(plotly)
+library(rstatix)
+```
+
+
+### Importing Dataset
+
+```{r}
+med_data <- read.csv("pone.0227108.s003.csv")
+```
+
+The dataset I'm using comes from a study published in PLOS One looking at characteristics of matriculating med school students and how their stats correlate to their performance in medical school. The authors wanted to investigate the characteristics of successful med school students.  
+
+The data was collected from application records of 1,088 students matriculating to NYU Grossman School of Medicine between the years 2006–2014 (from the American Medical College Application Service and the specific NYU School of Medicine forms).  
+Link to the Journal Paper: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0227108
+
+I'm repurposing the dataset to use for regression models along with some other comparisons. 
+
+The dataset has 50+ variables, but some highlights include: `BCPM.classes.hours`, `Disadvantaged`, `Total.uGPA` (total undergraduate GPA), `AOA` (membership in the prestigious Alpha Omega Alpha Honors Medical Society), `Median.income.zipcode` (median income of the zip code of the applicant's residence), and many more variables indicating academic and extracurricular involvement related to medical school. 
+
+
+### Dr. Woodward's Classification Diagnostic Function
+For my logistic regression models, I will be getting diagnostics for the performance of the model using the function created by Dr. Woodward. All credit goes to him for this function. 
+```{r}
+#HERE'S THE CLASSIFICAITON DIAGNOSTICS FUNCTION
+# All credit for this function goes to Dr. Woodward
+class_diag<-function(probs,truth){
+  tab<-table(factor(probs>.5,levels=c("FALSE","TRUE")),truth)
+  acc=sum(diag(tab))/sum(tab)
+  sens=tab[2,2]/colSums(tab)[2]
+  spec=tab[1,1]/colSums(tab)[1]
+  ppv=tab[2,2]/rowSums(tab)[2]
+  f1=2*(sens*ppv)/(sens+ppv)
+
+  if(is.numeric(truth)==FALSE & is.logical(truth)==FALSE){
+    truth<-as.numeric(truth)-1}
+  
+  #CALCULATE EXACT AUC
+  ord<-order(probs, decreasing=TRUE)
+  probs <- probs[ord]; truth <- truth[ord]
+  
+  TPR=cumsum(truth)/max(1,sum(truth)) 
+  FPR=cumsum(!truth)/max(1,sum(!truth))
+  
+  dup<-c(probs[-1]>=probs[-length(probs)], FALSE)
+  TPR<-c(0,TPR[!dup],1); FPR<-c(0,FPR[!dup],1)
+  
+  n <- length(TPR)
+  auc<- sum( ((TPR[-1]+TPR[-n])/2) * (FPR[-1]-FPR[-n]) )
+
+  data.frame(acc,sens,spec,ppv,f1,auc)
+}
+```
+
+### MANOVA
+My first analysis will be to perform a MANOVA Test.
+
+This MANOVA looks at whether a matriculants's competitiveness both before and after entry to medical school differed across application years. 
+
+Applicant performance is characterized by number of acceptances and MCAT score percentile, and matriculant performance is characterized by USMLE Step 1 and 2 scores. The comparisons will be across a 9 year period between 2006-2014.
+
+Subsequent ANOVA's and post-hoc tests will be done if MANOVA results are significant to determine the specific year and metric that differed.
+
+```{r}
+# Manova of outcomes of applicants and matriculants across application years
+
+# setting up dataset to do this analysis
+med_data_for_MANOVA <- med_data %>% mutate(Application.year = as.factor(Application.year)) %>% select(Application.year,Number.of.schools.accepted.to,Step.1.score,Step.2.score,MCAT.total.percentile) %>% mutate(Step.2.score=as.numeric(as.character(Step.2.score)),MCAT.total.percentile=as.numeric(as.character(MCAT.total.percentile))) %>% na.omit()
+
+# Run the Manova
+med_MANOVA <- manova(cbind(Number.of.schools.accepted.to,Step.1.score,Step.2.score,MCAT.total.percentile)~Application.year,data=med_data_for_MANOVA)
+  
+# View results
+summary(med_MANOVA)
+```
+We can see from the MANOVA results that the performance metrics were different across application years with p-value < 2.2e-16.
+This shows that at least one of our performance metrics was significantly different across application year. This is interesting as it has implications for either medical school competitiveness or quality, depending on whether the metric is detailing applicant performance vs. matriculant performance.
+
+```{r}
+summary.aov(med_MANOVA)
+```
+From univariate ANOVA's, we can see that Step 1 score, Step 2 score, and MCAT percentile were significantly different between applications years. 
+The number of medical school acceptances was not significantly different between application years. 
+This presents a number of interesting implications. The fact that acceptances remained stable while MCAT percentiles changed may point to a change in standards for what constitutes a competitive applicant. The fact that medical school acceptances were stable is unsurprising given medical school's need for new tuition-paying students. 
+
+The fact that both of the matriculant performance metrics were significantly different between application years may point to a change in the quality of education of medical schools in preparing students for their step exams. They may alternatively, imply changes in standards or the format of the exams themselves.
+
+Of course, these statements are qualified under the assumption that the metrics I have chosen are representative of overall student performance and competence. We would not expect these metrics to change year to year. Changes in these metrics may imply changes in standards for medical schools. The specific years that are different are less important than the fact that differences exist. Also, my test is limited in scope since I am sampling from a population of matriculants from a single school. Thus, when I try to generalize the results, I make the assumption that NYU Grossman School of Medicine is representative of all medical schools nationwide.
+
+Pairwise t-test were then performed to see what specific application years differed by the different metrics.
+```{r}
+pairwise.t.test(med_data_for_MANOVA$Step.1.score, med_data_for_MANOVA$Application.year, p.adj="none")
+
+pairwise.t.test(med_data_for_MANOVA$Step.2.score, med_data_for_MANOVA$Application.year, p.adj="none")
+
+pairwise.t.test(med_data_for_MANOVA$MCAT.total.percentile, med_data_for_MANOVA$Application.year, p.adj="none")
+
+```
+
+In total, I performed 1 MANOVA, 4 ANOVA's, and 108 pairwise t-tests for a total of 113 tests. 
+
+The probability of making at least 1 type error across all these tests is $P(At\ least\ one\ Type\ 1\ Error) = 1-P(No\ Type\ 1\ Error) = 1-.95^{113}=.997$
+
+Using the bonferroni correction, the multiple comparison adjustment becomes $\alpha = .05/113 = 4.425*10^{-4}$ for the new significance level to maintain an overall type 1 error rate of 0.05. 
+
+Post-hoc tests showed differences in Step 1 scores in: 2011 vs. 2007, 2011 vs. 2008, and 2011-2013 vs. 2009. It seems that 2011 and 2009 were peculiar years. 
+
+Post-hoc tests showed differences in Step 2 scores in: 2012-2013 vs. 2006.
+
+Post-hoc tests for MCAT percentile showed a couple of differences. 
+There was a difference between 2012 vs. 2006 and 2013 was significantly different from all years except for 2012, wonder what happened there? It seems that 2013 was a peculiar year for the MCAT.
+
+A mention to the assumptions:  
+1. We have random samples and independent observations  
+2. Multivariate Normality was not met  
+3. Homogeneity of within-group covariance matrices was not met  
+4. Linear relationships among dependent variables is likely to be met  
+5. No extreme outliers is likely to be met  
+6. No multicollinearity is unlikely to be met  
+
+```{r}
+group <- med_data_for_MANOVA$Application.year 
+DVs <- med_data_for_MANOVA %>% select(Number.of.schools.accepted.to,Step.1.score,Step.2.score,MCAT.total.percentile)
+
+#Test multivariate normality for each group (null: assumption met)
+sapply(split(DVs,group), mshapiro_test)
+
+#If any p<.05, stop. If not, test homogeneity of covariance matrices
+
+#Box's M test (null: assumption met)
+box_m(DVs, group)
+```
+
+
+### Randomization Test
+
+In this randomization test, I look at whether the average MCAT percentile of matriculants differs based on sex. Using randomization to scramble sex labels from scores, I generated an empirical null distribution for the average difference in MCAT percentile between sexes and compared my test statistic to it. 
+
+```{r}
+# Test whether MCAT percentiles are different based on sex
+#	Gender	1 - Female, 0 - Male
+
+# Prep data for this analysis
+gender_analysis <- med_data %>% mutate(MCAT.total.percentile=as.numeric(as.character(MCAT.total.percentile))) #make a new dataset for this test
+
+gender_analysis<- gender_analysis%>% mutate(Gender=case_when(Gender==1~"Female",Gender==0~"Male")) %>%  select(Gender, MCAT.total.percentile) #get the variables you need and dummy code from binary to gender for convenience
+
+# Initialize variable for randomization
+diff_boot <- numeric()
+
+# Generate empirical null distibution of mean differences (male-female)
+for (i in 1:5000){
+  boot_dat <- gender_analysis%>%mutate(MCAT.total.percentile=sample(MCAT.total.percentile)) #scramble rows
+  diff_boot[i] <- boot_dat %>% group_by(Gender)%>% summarise(average.MCAT.total.percentile=mean(MCAT.total.percentile,na.rm = T)) %>% pull %>% diff #calculate difference in means
+}
+
+# Calculate actual test stat (Difference in average MCAT percentile between male and female, male-female)
+test_stat<- gender_analysis%>% group_by(Gender)%>% summarise(average.MCAT.total.percentile=mean(MCAT.total.percentile,na.rm = T)) %>% pull %>% diff
+
+# Calculate Empirical p-value
+p_value <- mean(abs(diff_boot)>test_stat)
+
+# Visualize Empirical Null Distribution
+diff_boot %>% as.data.frame() %>% rename(.,"diffs"=`.`) %>% ggplot()+
+  geom_histogram(aes(diffs))+
+  geom_vline(xintercept = test_stat)+
+  scale_x_continuous(breaks=round(c(test_stat,seq(-1,3,1)),2))+
+  ggtitle("Empirical Null Distribution of Difference in Mean MCAT Percentile Between Sexes")+
+  ylab("Frequency")+
+  xlab("Difference in Mean")
+```
+Ho: There is no difference on average in the MCAT percentile of male and female matriculants.
+
+Ha: There is a significant difference on average in the MCAT percentile of male and female matriculants. 
+
+We can see from the empirical p-value of `r p_value`, that on average, MCAT performance differed between male and female matriculants. 
+This could imply some sex bias in admissions, but we would need more information to tell.  
+Also while a `r test_stat %>% round(3)` percentile difference may be statistically significant, it may not be meaningful in context. It may be too small for anyone to care. 
+
+### Linear Regression
+
+In this linear regression I hope to build a model that will predict the undergraduate GPA of a med school matriculant based on the total BCPM (Biology, Chemistry, Physics, Math) hours they took in college and the median income of the zip code of their residence. 
+
+This will provide insight into how education and financials may affect the undergraduate performance of successful med school applicants (matriculants). 
+
+```{r}
+# Linear Regression
+
+# Prep data for this analysis
+med_data_for_lm <- med_data %>% mutate(BCPM.classes.hours_C=(BCPM.classes.hours-mean(BCPM.classes.hours)),Median.income.zipcode_C=(Median.income.zipcode-mean(Median.income.zipcode)))
+
+# Run the regression
+linear_model <-lm(Total.uGPA~BCPM.classes.hours_C*Median.income.zipcode_C,data=med_data_for_lm)
+
+# See what the fit looks like
+new1 <-med_data_for_lm %>% select(BCPM.classes.hours_C,Total.uGPA,Median.income.zipcode_C) %>% 
+  mutate(mean=predict(linear_model,newdat=mutate(med_data_for_lm, Median.income.zipcode_C = mean(Median.income.zipcode_C))))
+
+new1 <- new1 %>% 
+  mutate(plus.sd=predict(linear_model,newdat=mutate(new1, Median.income.zipcode_C = mean(Median.income.zipcode_C)+sd(Median.income.zipcode_C))))
+new1 <- new1 %>% 
+  mutate(minus.sd=predict(linear_model,newdat=mutate(new1, Median.income.zipcode_C = mean(Median.income.zipcode_C)-sd(Median.income.zipcode_C))))
+
+new1 <- new1 %>% select(BCPM.classes.hours_C,Total.uGPA,mean,plus.sd,minus.sd) %>% pivot_longer(c(mean,plus.sd,minus.sd),names_to="Median.income.zipcode_C", values_to="GPA")
+
+ggplot(new1, aes(BCPM.classes.hours_C, Total.uGPA))+geom_point()+geom_line(aes(y=GPA, color=Median.income.zipcode_C),size=1.5)+ggtitle("Effect of Median Income and Total BCPM Hours on Overall GPA")
+
+# view results
+linear_model %>% summary
+
+# Robust standard errors
+coeftest(linear_model,vcov=vcovHC(linear_model))
+```
+The linear model shows that both BCPM hours and Median income by zip code were significant effectors for undergraduate GPA. These results did not differ significantly before or after robust standard errors were used. 
+
+BCPM hours had a coefficient of -7.4712e-04 meaning that, for matriculants living in a zip code with average median income, each additional hour above average of BCPM classes a matriculant had taken negatively affected their GPA by -7.4712e-04 points. 
+
+The Median income by zip code coefficient of -3.9862e-07 shows that,for matriculants taking an average amount of BCPM courses, for each additional dollar in the median income of the matriculant's address above average, their GPA went down by -3.9862e-07 points. 
+
+The interaction coefficient of 1.0908e-08 shows that the effect of BCPM classes or median income by zip code on GPA increases by 1.0908e-08 for each 1 unit increase of either BCPM classes or median income by zip code. It would appear that taking more BCPM classes is beneficial to GPA for those of higher income while detrimental to GPA for those of lower income. 
+However, the effect was small and the interaction not significant.
+
+It is not surprising that taking more courses in BCPM classes had a detrimental effect on GPA. Those courses are generally very challenging. What's more interesting is that increased income seemed to have a detrimental affect on academic performance. There may be a number of explanations. Perhaps income data should be collected more directly, rather than using the value associated with a zip code. Or perhaps this result is capturing some difference in behavior as a result of higher income. More information would be needed to reach a conclusion.
+
+Of course, these results are limited by the fact that the model did not meet the assumptions and only applies to matriculants from a single medical school.  
+Furthermore, the model only explains 0.01227 or roughly 1% of the data. Thus, the results hold little weight.
+
+Check Assumptions:   
+1. Linear model assumption not met  
+2. Normality assumption not met  
+3. Homoskedasticity assumption was met
+```{r}
+# Checking Assumptions
+
+# Linear relationship
+med_data %>% ggplot()+geom_point(aes(Median.income.zipcode,Total.uGPA))
+med_data %>% ggplot()+geom_point(aes(BCPM.classes.hours,Total.uGPA))
+
+# Normality of residuals
+resids <- linear_model$residuals %>% as.data.frame() %>% rename(.,"residuals"=`.`)
+resids %>% ggplot()+geom_histogram(aes(residuals))
+ks.test(resids$residuals,"pnorm",mean=0,sd(resids$residuals))
+shapiro.test(resids$residuals)
+
+# Check homoskedasticity
+fitted <- linear_model$fitted.values%>% as.data.frame() %>% rename(.,"fitted_values"=`.`)
+cbind(resids,fitted) %>% ggplot()+geom_point(aes(fitted_values,residuals))
+bptest(linear_model)
+```
+
+```{r}
+# Boostrapped standard erros by resampling observations
+
+samp_distn<-replicate(5000, {
+  boot_dat <- sample_frac(med_data_for_lm, replace=T)
+  fit <- lm(Total.uGPA~BCPM.classes.hours_C*Median.income.zipcode_C,data=boot_dat)
+  coef(fit)
+})
+samp_distn %>% t %>% as.data.frame %>% summarize_all(sd)
+
+```
+Using bootstrapped standard errors did not change the results. The bootstrapped standard errors are very close to the default and robust standard errors. 
+
+### Optional Plotly Plot for Fun
+
+Here is an optional plotly plot I included to better visualize the interaction. 
+
+```{R warning=F, message=F}
+axis_x <- seq(min(med_data_for_lm$BCPM.classes.hours_C), max(med_data_for_lm$BCPM.classes.hours_C), by = 10)
+axis_y <- seq(min(med_data_for_lm$Median.income.zipcode_C), max(med_data_for_lm$Median.income.zipcode_C), by = 1000)
+
+#Sample points
+BP_surface <- expand.grid(BCPM.classes.hours_C = axis_x, Median.income.zipcode_C = axis_y,KEEP.OUT.ATTRS = F)
+BP_surface$GPA <- predict.lm(linear_model, newdata = BP_surface)
+BP_surface <- BP_surface%>% pivot_wider(names_from = "BCPM.classes.hours_C",values_from="GPA")%>%column_to_rownames("Median.income.zipcode_C") %>%as.matrix
+
+mult_plot <- plot_ly(med_data_for_lm, 
+                     x = ~BCPM.classes.hours_C, 
+                     y = ~Median.income.zipcode_C, 
+                     z = ~Total.uGPA,
+                     type = "scatter3d", 
+                     mode = "markers")
+
+mult_plot <- add_trace(p = mult_plot,
+                       z = BP_surface,
+                       x = axis_x,
+                       y = axis_y,
+                       type = "surface",
+                       color="gray")
+mult_plot
+```
+
+
+### Logistic Model only for Selected Variables
+
+This logistic model uses selected variables to determine probabilities of entry into a prestigious medical school honors society, Alpha Omega Alpha. 
+https://www.alphaomegaalpha.org/#gsc.tab=0
+
+Categorical predictors include whether or not the matriculant attended grad school or undertook a post-bac.
+Numeric predictors include the matriculant's USMLE Step 1 and Step 2 scores.
+
+```{r}
+# Logistic model for selected variables
+
+# set up dataset for analysis
+med_data_for_logistic <-med_data %>% select(-1) %>%   
+  mutate(Step.1.score=as.numeric(as.character(Step.1.score)),Step.2.score=as.numeric(as.character(Step.2.score))) %>% 
+  mutate(Did.postbac=as.factor(Did.postbac), Attended.grad.school=as.factor(Attended.grad.school))%>%
+  mutate(Step.1.score_C=Step.1.score-mean(Step.1.score,na.rm=TRUE),Step.2.score_C=Step.2.score-mean(Step.2.score,na.rm=TRUE)) %>%
+  na.omit() %>% filter(AOA != "Null") %>% mutate(AOA=as.character(AOA)) %>% mutate(AOA=as.numeric(AOA)) %>%
+  mutate(AOA=as.factor(AOA))
+
+# run the logistic model
+logistic_model_selected <- glm(AOA~Did.postbac+Attended.grad.school+Step.1.score_C+Step.2.score_C, data = med_data_for_logistic, family = "binomial")
+
+# View results
+summary(logistic_model_selected)
+exp(coef(logistic_model_selected))
+```
+The reference group is matriculants with no post-bac or grad school experience and who score an average score on both Step 1 and Step 2 exams. 
+
+The exponentiated coefficient for Did.postbac was `r exp(coef(logistic_model_selected))[2] %>% as.numeric %>% round(3)`. Controlling for the other predictors, a matriculant that undertook a post-bac had odds of entry `r exp(coef(logistic_model_selected))[2] %>% as.numeric %>% round(3)` times that of the one who didn't. Thus, doing a post-bac hurts odds of admissions.
+
+The exponentiated coefficient for Attended.grad.school was `r exp(coef(logistic_model_selected))[3] %>% as.numeric %>% round(3)`.
+Controlling for the other predictors, a matriculant that did went to grad school had odds of entry `r exp(coef(logistic_model_selected))[3] %>% as.numeric %>% round(3)` times that of the one that didn't.
+Grad school seems to hurt one's admission chances.
+
+The exponentiated coefficient for Step.1.score_C was `r exp(coef(logistic_model_selected))[4] %>% as.numeric %>% round(3)`.
+Controlling for the other predictors, a matriculant can increase their odds of admission by a factor of `r exp(coef(logistic_model_selected))[4] %>% as.numeric %>% round(3)` or a 6% increase with each point above average they scored as compared to an average scorer. 
+
+The exponentiated coefficient for Step.2.score_C was `r exp(coef(logistic_model_selected))[5] %>% as.numeric %>% round(3)`.
+Controlling for the other predictors, a matriculant can increase their odds of admission by a factor of `r exp(coef(logistic_model_selected))[5] %>% as.numeric %>% round(3)` or a 5% increase with each point above average they scored as compared to an average scorer. 
+
+```{r}
+# diagnostics
+class_diag(predict(logistic_model_selected, type="response"),med_data_for_logistic$AOA)
+
+logistic_selected_auc <- class_diag(predict(logistic_model_selected, type="response"),med_data_for_logistic$AOA) %>% select(auc) %>% pull %>% round(3)
+
+# confusion matrix
+table(prediction=ifelse(predict(logistic_model_selected, type="response")>0.5,1,0),truth=med_data_for_logistic$AOA) %>% addmargins()
+
+# Density plot of log-odds for each outcome:
+med_data_for_logistic_plot <- med_data_for_logistic
+med_data_for_logistic_plot$logit<-predict(logistic_model_selected,type="link")
+
+med_data_for_logistic_plot %>% ggplot()+
+  geom_density(aes(logit,color=AOA,fill=AOA), alpha=.4)+
+  theme(legend.position=c(.2,.85))+
+  geom_vline(xintercept=0)+xlab("logit (log-odds)")+
+  geom_rug(aes(logit,color=AOA))
+
+# ROC plot
+med_data_for_logistic_plot$prob<-predict(logistic_model_selected,type="response")
+med_data_for_logistic_plot <- med_data_for_logistic_plot %>% mutate(AOA=as.character(AOA)) %>% mutate(AOA=as.numeric(AOA))
+ROCplot<-ggplot(med_data_for_logistic_plot)+geom_roc(aes(d=AOA,m=prob), n.cuts=0)
+ROCplot
+calc_auc(ROCplot)
+```
+The model has an AUC of `r logistic_selected_auc` which appears decent. However, looking at the density plot and examining the other diagnostics paints a fuller picture. We can see that most of the performance is coming from the correct prediction of true negatives. Since the honors society is competitive, many matriculants do not get accepted. Thus, the high number of not accepted matriculants inflates the AUC. As more evidence, we can see that the model is doing poorly at classifying admittants to the AOA honors society, with a sensitivity of `r class_diag(predict(logistic_model_selected, type="response"),med_data_for_logistic$AOA) %>% select(sens) %>% pull %>% round(3)`. Thus, this model does a poor job of predicting whether a matriculant will be able to gain entry into AOA on the basis of our four predictors: post-bac experience, grad school experience, and Step 1 and 2 scores. 
+
+Perhaps there are other factors that are more predictive of admittance into AOA. 
+
+### Logistic Model Using All Variables
+
+By giving the model more data, I can improve on the predictive/classification performance. However, I will have to address the problem of overfitting. 
+
+I will only be doing a main effects model because my computer can't handle running the interactions model. 
+
+```{r}
+# Logistic Model with everything
+
+# Set up dataset for analysis
+med_data_for_logistic_all <- med_data %>% select(-1) %>%   
+  mutate(Step.1.score=as.numeric(as.character(Step.1.score)),Step.2.score=as.numeric(as.character(Step.2.score))) %>% 
+  mutate(Did.postbac=as.factor(Did.postbac), Attended.grad.school=as.factor(Attended.grad.school))%>%
+  na.omit() %>% filter(AOA != "Null") %>% mutate(AOA=as.character(AOA)) %>% mutate(AOA=as.numeric(AOA)) %>%
+  mutate(AOA=as.factor(AOA)) %>% 
+  mutate_at(.vars = c("MCAT.total.percentile","Clerkship.honors","Clerkship.fails","Shelf.exams.above.90","Shelf.exams.below.65"),function(x)as.numeric(as.character(x))) %>% 
+  mutate(Application.year=as.factor(Application.year)) %>% 
+  na.omit()
+
+# Run the model
+logistic_model_all <- glm(AOA~.,data=med_data_for_logistic_all,family = "binomial")
+
+# diagnostics
+probs <- predict(logistic_model_all,type = "response")
+class_diag(probs = probs,truth = med_data_for_logistic_all$AOA)
+in_samp_auc <- class_diag(probs = probs,truth = med_data_for_logistic_all$AOA) %>% select(auc) %>% pull %>% round(3) 
+
+# confusion matrix
+table(prediction=ifelse(predict(logistic_model_all, type="response")>0.5,1,0),truth=med_data_for_logistic_all$AOA) %>% addmargins()
+```
+We can see from the in-sample diagnostics that performance across the board was greatly improved by adding all our variables. The sensitivity has also been improved compared to previous model. Now the sensitivity is `r class_diag(probs = probs,truth = med_data_for_logistic_all$AOA) %>% select(sens) %>% pull %>% round(3)`, much better. The additional data allowed the model to better predict and fit the data. Now we must check for overfitting with cross-validation. 
+
+```{r}
+# k-fold cross-validation
+k=10
+
+CV_data<-med_data_for_logistic_all[sample(nrow(med_data_for_logistic_all)),]
+folds<-cut(seq(1:nrow(med_data_for_logistic_all)),breaks=k,labels=FALSE)
+
+diags<-NULL
+for(i in 1:k){
+  
+  train<-CV_data[folds!=i,] 
+  test<-CV_data[folds==i,]
+  truth_CV<-test$AOA
+
+fit_CV <- glm(AOA~., data=train, family="binomial")
+probs_CV <- predict(fit_CV,newdata=test,type="response")
+
+diags<-rbind(diags,class_diag(probs_CV,truth_CV)) 
+}
+
+summarize_all(diags,mean)
+
+out_of_samp_auc <- summarize_all(diags,mean) %>% select(auc) %>% pull %>% round(3)
+```
+Running the logistic model with all variables provides better classification performance for about all metrics. The classification diagnostics are all about 0.7 or above, meaning good performance across the board. 
+The in-sample auc was `r in_samp_auc` which is comparable to the cross-validated auc of `r out_of_samp_auc`. There doesn't seem to have been much overfitting. The with the high sensitivity and high auc, we can be more confident in our model's ability to predict acceptance into AOA. 
+
+### LASSO
+
+I used lasso to determine which subset of my 50+ variables are good predictors for acceptance to AOA. 
+
+```{r}
+# Lasso
+
+y<-as.matrix(med_data_for_logistic_all$AOA)
+predictors<-model.matrix(logistic_model_all)[,-1]
+predictors <- scale(predictors)
+predictors[is.nan(predictors)] <- 0
+
+cv <- cv.glmnet(predictors,y, family="binomial")
+
+lasso_fit<-glmnet(predictors,y,family="binomial",lambda=cv$lambda.1se)
+
+# non-zero coefficients
+non_zero_coef <- coef(lasso_fit) %>% as.matrix %>% as.data.frame %>% filter(!s0==0) %>% rownames_to_column(var = "temp") %>% select(temp) %>% pull %>% .[-1]
+
+non_zero_coef
+```
+The non-zero coefficients that were retained were `r non_zero_coef`.  
+
+We can see some variables pertaining to application year, which is peculiar. Application year may be meaningful if AOA changed it's policies for admission at any time during this period. 
+
+There are also some variables pertaining to college coursework performance, which makes sense intuitively though I wonder if the admissions coucil would look that far back.
+
+The ones that make the most sense are the varaibles pertaining to medical school performance, which I can imagine would have a direct impact on admission chances.
+
+```{r}
+# confusion matrix
+table(prediction=ifelse(predict(lasso_fit, predictors, type="response")>0.5,1,0),truth=med_data_for_logistic_all$AOA) %>% addmargins()
+
+# k-fold cross-validation
+k=10
+
+# fancy code to automatically pull nonzero coefficients
+cof_logic <- ((predictors %>% colnames()) %in% non_zero_coef)
+
+# dataset of lasso predictors and response variable 
+lasso_CV <- cbind(med_data_for_logistic_all %>% select(AOA),predictors[,cof_logic])
+
+CV<- lasso_CV[sample(nrow(lasso_CV)),]
+
+folds <- cut(seq(1:nrow(CV)),breaks=k,labels=FALSE)
+
+diags<-NULL
+for(i in 1:k){
+
+train<-CV[folds!=i,]
+test<-CV[folds==i,]
+truth_CV<-test$AOA
+
+fit_CV <- glm(AOA~., data = train, family="binomial")
+
+probs_CV<-predict(fit_CV,newdata = test,type="response")
+
+diags<-rbind(diags,class_diag(probs_CV,truth_CV))
+}
+diags %>% summarise_all(mean)
+lasso_model_auc <- diags %>% summarise_all(mean) %>% select(auc) %>% pull %>% round(3)
+fit_CV %>% summary
+```
+Redoing the regression with the lasso-determined variables, we get an cross-validated auc of `r lasso_model_auc`. Compare this to the cross-validated auc of the full main effects model of `r out_of_samp_auc` and we can see that the performance of the lasso model is slightly better. On closer examination, the other diagnostic metrics are close in value as well. It seems like most of the variables were not meaningfully contributing to the regression model. A simpler model works just as well. 
+
+Both the lasso and all-variables model performed much better than the model with the variables I selected. It looks like in the future I should either use everything or let the computer decide which predictors work best.
+
+We can see that there was some overfitting as the cross-validated auc of the full model is lower than lasso's. Yet, the difference isn't that great. Perhaps this is because of the large number of observations in the dataset, which would help prevent overfitting. Also, I did not run the full interactions model, which would have suffered even more from overfitting. 

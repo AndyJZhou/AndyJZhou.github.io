@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Projects on Andy Zhou</title>
+    <link>/project/</link>
+    <description>Recent content in Projects on Andy Zhou</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Wed, 25 Nov 2020 00:00:00 +0000</lastBuildDate><atom:link href="/project/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Comp Bio Project 2</title>
+      <link>/project/project2/</link>
+      <pubDate>Wed, 25 Nov 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/project/project2/</guid>
+      <description>Importing Datasetmed_data &amp;lt;- read.csv(&amp;quot;pone.0227108.s003.csv&amp;quot;)The dataset I’m using comes from a study published in PLOS One looking at characteristics of matriculating med school students and how their stats correlate to their performance in medical school. The authors wanted to investigate the characteristics of successful med school students.
+The data was collected from application records of 1,088 students matriculating to NYU Grossman School of Medicine between the years 2006–2014 (from the American Medical College Application Service and the specific NYU School of Medicine forms).</description>
+    </item>
+    
+    <item>
+      <title>Comp Bio Project 1</title>
+      <link>/project/project1/</link>
+      <pubDate>Sun, 18 Oct 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/project/project1/</guid>
+      <description>library(tidyverse)library(cluster)library(GGally)IntroductionThe two datasets I have chosen are data local to my area (Bexar County) relating to the COVID-19 pandemic. The first dataset is COVID-19 data from San Antonio from February to September documenting information for cases, deaths, hospitalizations and ventilators. The second dataset pertains to the weather in San Antonio for that same time period. The weather measurements were collected from a weather station at San Antonio International Airport.</description>
+    </item>
+    
+  </channel>
+</rss>

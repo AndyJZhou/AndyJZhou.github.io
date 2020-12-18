@@ -1,0 +1,90 @@
+---
+title: Python Post
+author: 'Andy Zhou'
+date: '2020-12-05'
+slug: python-post
+categories: []
+tags: []
+description: ''
+---
+
+Hello, this post will demonstrate how RStudio allows for python and R to communicate with each other. 
+
+
+Let's load in some libraries.
+```{r}
+library(reticulate)
+library(tidyverse)
+sns <- import('seaborn')
+plt <- import('matplotlib.pyplot')
+pd <- import('pandas')
+```
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+```
+
+
+Here is an R chunk.
+```{r}
+print("Hello world. I am an R chunk.")
+```
+
+Here is a python chunk.
+```{python}
+print("Hello world. I am a python chunk.")
+```
+
+Here is a demonstration of python and R communicating with each other.
+
+Here we see the `iris` dataset.
+```{r}
+data(iris)
+iris %>% head
+```
+
+We can do some simple statistics. Here is the mean `Sepal.Length` by `Species`.
+```{r}
+iris_summary <- iris %>% group_by(Species) %>% summarise(mean(Sepal.Length))
+iris_summary
+```
+
+Now let's do this in python.
+We start by handing over the `iris` dataset from R to python.
+```{python}
+iris=r.iris
+iris
+```
+
+Now we can reproduce the same calcuation in python.
+```{python}
+iris_summary = iris.filter(["Sepal.Length", "Species"]).groupby(["Species"]).agg(["mean"])
+iris_summary.index.name = 'Species'
+iris_summary.reset_index(inplace=True)
+iris_summary
+```
+
+Let's cross streams!
+We'll use `ggplot` from R to plot the python output.
+```{r}
+py$iris_summary %>% row.names()
+py$iris_summary %>% ggplot()+
+  geom_histogram(aes(x=`Species           ` ,y=`Sepal.Length  mean`),stat="identity")
+
+```
+As you can see, R and python are easily communicating with each other.
+
+This concludes my demonstration. Here is a meme to send you on your way.
+
+![](https://i.imgur.com/1s9CgpU.jpg)
+
+Check out some of my other projects:
+[Link to project 1](/project/project1/)
+
+OR
+
+Exit this website:
+[Link to google](https://www.google.com)
